@@ -51,3 +51,4 @@ pkg
 Gemfile.lock
 
 my_test/
+.idea/

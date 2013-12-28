@@ -95,6 +95,7 @@ module Polipus
       @skip_links_like    = []
       @on_page_downloaded = []
       @on_before_save     = []
+      @should_save        = lambda{|p|true}
       @focus_crawl_block  = nil
       @on_crawl_end       = []
       @redis_factory      = nil
@@ -189,7 +190,7 @@ module Polipus
 
             incr_error if page.error
 
-            @storage.add page unless page.nil?
+            @storage.add page if (!page.nil? and @should_save.call(page))
             
             @logger.debug {"[worker ##{worker_number}] Fetched page: [#{page.url.to_s}] Referer: [#{page.referer}] Depth: [#{page.depth}] Code: [#{page.code}] Response Time: [#{page.response_time}]"}
             @logger.info  {"[worker ##{worker_number}] Page [#{page.url.to_s}] downloaded"}
@@ -257,6 +258,10 @@ module Polipus
     def on_before_save(&block)
       @on_before_save << block
       self
+    end
+
+    def should_save(&block)
+      @should_save = block
     end
 
     # A block of code will be executed
