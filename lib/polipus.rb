@@ -2,6 +2,7 @@
 require "redis"
 require "redis/connection/hiredis"
 require "redis-queue"
+require 'redis-namespace'
 require "polipus/version"
 require "polipus/http"
 require "polipus/storage"
@@ -363,7 +364,11 @@ module Polipus
         unless @redis_factory.nil?
           return @redis_factory.call(redis_options)
         end
-        Redis.new(redis_options)
+
+        namespace = redis_options.delete(:namespace)
+        r = Redis.new(redis_options)
+        r = Redis::Namespace.new(namespace.to_sym, redis: r) if namespace.present?
+        r
       end
 
       # It creates a new distributed queue
