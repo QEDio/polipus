@@ -96,7 +96,8 @@ module Polipus
       @skip_links_like    = []
       @on_page_downloaded = []
       @on_before_save     = []
-      @should_save        = lambda{|p|true}
+      @should_save        = lambda {|page| true}
+      @should_follow_links= lambda {|page| true}
       @focus_crawl_block  = nil
       @on_crawl_end       = []
       @redis_factory      = nil
@@ -191,7 +192,8 @@ module Polipus
 
             incr_error if page.error
 
-            @storage.add page if (!page.nil? and @should_save.call(page))
+            # allow user to tell us to save this page or not
+            @storage.add page if !page.nil? and @should_save.call(page)
             
             @logger.debug {"[worker ##{worker_number}] Fetched page: [#{page.url.to_s}] Referer: [#{page.referer}] Depth: [#{page.depth}] Code: [#{page.code}] Response Time: [#{page.response_time}]"}
             @logger.info  {"[worker ##{worker_number}] Page [#{page.url.to_s}] downloaded"}
@@ -201,7 +203,7 @@ module Polipus
             # Execute on_page_downloaded blocks
             @on_page_downloaded.each {|e| e.call(page)} unless page.nil?
 
-            if @options[:depth_limit] == false || @options[:depth_limit] > page.depth 
+            if @should_follow_links.call(page) && (@options[:depth_limit] == false || @options[:depth_limit] > page.depth)
               links_for(page).each do |url_to_visit|
                 next unless should_be_visited?(url_to_visit)
                 enqueue url_to_visit, page, queue
@@ -263,6 +265,12 @@ module Polipus
 
     def should_save(&block)
       @should_save = block
+      self
+    end
+
+    def should_follow_links(&block)
+      @on_follow_links << block
+      self
     end
 
     # A block of code will be executed
