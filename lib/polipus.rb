@@ -94,6 +94,7 @@ module Polipus
       @on_page_downloaded = []
       @on_before_save     = []
       @should_save        = lambda {|page| true}
+      @on_message_received= []
       @focus_crawl_block  = nil
       @on_crawl_end       = []
       @redis_factory      = nil
@@ -143,6 +144,8 @@ module Polipus
             execute_plugin 'on_message_received'
 
             page = Page.from_json message
+
+            @on_message_received.each {|e| e.call(page)}
 
             unless should_be_visited?(page.url, false)
               @logger.info {"[worker ##{worker_number}] Page [#{page.url.to_s}] is no more welcome."}
@@ -257,6 +260,11 @@ module Polipus
 
     def should_follow_links(&block)
       @on_follow_links << block
+      self
+    end
+
+    def on_message_received(&block)
+      @on_message_received << block
       self
     end
 
