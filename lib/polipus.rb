@@ -1,21 +1,20 @@
 # encoding: UTF-8
-require "redis"
-require "redis/connection/hiredis"
-require "redis-queue"
+require 'redis'
+require 'redis/connection/hiredis'
+require 'redis-queue'
 require 'redis-namespace'
-require "polipus/version"
-require "polipus/http"
-require "polipus/storage"
-require "polipus/url_tracker"
-require "polipus/plugin"
-require "polipus/queue_overflow"
-require "thread"
-require "logger"
-require "json"
-require "singleton"
+require 'polipus/version'
+require 'polipus/http'
+require 'polipus/storage'
+require 'polipus/url_tracker'
+require 'polipus/plugin'
+require 'polipus/queue_overflow'
+require 'thread'
+require 'logger'
+require 'json'
+require 'singleton'
 
 module Polipus
-  
   def Polipus.crawler(job_name = 'polipus', urls = [], options = {}, &block)
     PolipusCrawler.crawl(job_name, urls, options, &block)
   end
@@ -59,6 +58,7 @@ module Polipus
       :accept_cookies => false,
       # A set of hosts that should be considered parts of the same domain
       # Eg It can be used to follow links with and without 'www' domain
+      # Format: http://www.abc.com, http://abc.com
       :domain_aliases => []
     }
 
@@ -68,7 +68,6 @@ module Polipus
     attr_reader :overflow_adapter
     attr_reader :options
     attr_reader :crawler_name
-
 
     OPTS.keys.each do |key|
       define_method "#{key}=" do |value|
@@ -80,31 +79,27 @@ module Polipus
     end
 
     def initialize(job_name = 'polipus',urls = [], options = {})
+      @job_name           = job_name
+      @options            = OPTS.merge(options)
+      @logger             = @options[:logger]  ||= Logger.new(nil)
+      @logger.level       = @options[:logger_level] ||= Logger::INFO
+      @storage            = @options[:storage] ||= Storage.dev_null
 
-      @job_name     = job_name
-      @options      = OPTS.merge(options)
-      @logger       = @options[:logger]  ||= Logger.new(nil)
-      @logger.level = @options[:logger_level] ||= Logger::INFO
-      @storage      = @options[:storage] ||= Storage.dev_null
-
-      @http_pool    = []
-      @workers_pool = []
-      @queues_pool  = []
-      
+      @http_pool          = []
+      @workers_pool       = []
+      @queues_pool        = []
       
       @follow_links_like  = []
       @skip_links_like    = []
       @on_page_downloaded = []
       @on_before_save     = []
       @should_save        = lambda {|page| true}
-      @should_follow_links= lambda {|page| true}
       @focus_crawl_block  = nil
       @on_crawl_end       = []
       @redis_factory      = nil
 
-      
-      @overflow_manager = nil
-      @crawler_name = `hostname`.strip + "-#{@job_name}"
+      @overflow_manager   = nil
+      @crawler_name       = `hostname`.strip + "-#{@job_name}"
 
       @storage.include_query_string_in_uuid = @options[:include_query_string_in_saved_page]
 
@@ -113,17 +108,14 @@ module Polipus
       execute_plugin 'on_initialize'
 
       yield self if block_given?
-
     end
 
     def self.crawl(job_name, urls, opts = {})
-
       self.new(job_name, urls, opts) do |polipus|
         yield polipus if block_given?
         
         polipus.takeover
       end
-      
     end
 
     def takeover
@@ -203,7 +195,7 @@ module Polipus
             # Execute on_page_downloaded blocks
             @on_page_downloaded.each {|e| e.call(page)} unless page.nil?
 
-            if @should_follow_links.call(page) && (@options[:depth_limit] == false || @options[:depth_limit] > page.depth)
+            if @options[:depth_limit] == false || @options[:depth_limit] > page.depth
               links_for(page).each do |url_to_visit|
                 next unless should_be_visited?(url_to_visit)
                 enqueue url_to_visit, page, queue
@@ -217,7 +209,7 @@ module Polipus
             execute_plugin 'on_message_processed'
 
             if PolipusSignalHandler.terminated?
-              @logger.info {"About to exit! Thanks for using Polipus"}
+              @logger.info {'About to exit! Thanks for using Polipus'}
               queue.commit
               break
             end
@@ -260,11 +252,6 @@ module Polipus
     # before being saved in the registered storage
     def on_before_save(&block)
       @on_before_save << block
-      self
-    end
-
-    def should_save(&block)
-      @should_save = block
       self
     end
 
@@ -448,11 +435,11 @@ module Polipus
 
     def self.enable
       trap(:INT)  {
-        puts "Got INT signal"
+        puts 'Got INT signal'
         self.terminate
       }
       trap(:TERM) {
-        puts "Got TERM signal"
+        puts 'Got TERM signal'
         self.terminate
       }
     end
