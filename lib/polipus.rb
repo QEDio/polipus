@@ -175,7 +175,7 @@ module Polipus
               @logger.info {"Got redirects! #{rurls}"}
               page = pages.pop
               page.aliases = pages.collect { |e| e.url }
-              if @storage.exists?(page)
+              if @@storage.exists?(page)
                 @logger.info {"[worker ##{worker_number}] Page [#{page.url.to_s}] already stored."}
                 queue.commit
                 next
@@ -375,7 +375,7 @@ module Polipus
 
         namespace = redis_options.delete(:namespace)
         r = Redis.new(redis_options)
-        r = Redis::Namespace.new(namespace.to_sym, redis: r) if namespace.present?
+        #r = Redis::Namespace.new(namespace.to_sym, redis: r) if namespace.present?
         r
       end
 

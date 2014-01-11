@@ -1,4 +1,4 @@
-source "http://rubygems.org"
-gem 'mongo', git: 'https://github.com/mongodb/mongo-ruby-driver.git'
+source 'http://rubygems.org'
+gem 'mongo', git: 'git@github.com:jak4/mongo-ruby-driver.git'
 
 gemspec

@@ -1,14 +1,16 @@
-require "mongo"
-require "zlib"
-require "thread"
+require 'mongo'
+require 'zlib'
+require 'thread'
+
 module Polipus
   module Storage
     class MongoStore < Base
       BINARY_FIELDS = %w(body headers data)
+      # not compatible with mongo 2.0.0
       def initialize(options = {})
         @mongo      = options[:mongo]
         @collection = options[:collection]
-        #@mongo.create_collection(@collection)
+        @mongo.create_collection(@collection)
         @mongo[@collection].ensure_index(:uuid, :unique => true, :drop_dups => true, :background => true)
         @compress_body = options[:compress_body] ||= true
         @except = options[:except] ||= []
