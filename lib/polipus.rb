@@ -203,10 +203,12 @@ module Polipus
             if @options[:depth_limit] == false || @options[:depth_limit] > page.depth
               urls_to_visit = []
               start = Time.now
+
               links_for(page).each do |url_to_visit|
                 next unless should_be_visited?(url_to_visit)
                 urls_to_visit << url_to_visit
               end
+
               @logger.info {"links_for_loop took: #{Time.now - start} seconds"}
 
               enqueue urls_to_visit, page, queue if urls_to_visit.present?
@@ -338,7 +340,7 @@ module Polipus
     private
       # URLs enqueue policy
       def should_be_visited?(url, with_tracker = true)
-
+        start = Time.now
         # Check against whitelist pattern matching
         unless @follow_links_like.empty?
           return false unless @follow_links_like.any?{|p| url.path =~ p}  
@@ -353,13 +355,16 @@ module Polipus
         if with_tracker
           return false if  url_tracker.visited?(@options[:include_query_string_in_saved_page] ? url.to_s : url.to_s.gsub(/\?.*$/,''))
         end
+        @logger.info {"should_be_visited took: #{Time.now - start} seconds"}
         true
       end
 
       # It extracts URLs from the page
       def links_for page
+        start = Time.now
         page.domain_aliases = domain_aliases
         links = @focus_crawl_block.nil? ? page.links : @focus_crawl_block.call(page)
+        @logger.info {"links_for: #{Time.now - start} seconds"}
         links
       end
 
