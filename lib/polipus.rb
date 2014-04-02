@@ -166,7 +166,7 @@ module Polipus
 
             start = Time.now
             pages = http.fetch_pages(url, page.referer, page.depth)
-            @logger.debug("http fetch took: #{Time.now - start} seconds")
+            @logger.debug {"http fetch took: #{Time.now - start} seconds"}
 
             if pages.count > 1
               rurls = pages.map { |e| e.url.to_s }.join(' --> ')
