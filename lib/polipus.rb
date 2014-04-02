@@ -353,7 +353,7 @@ module Polipus
 
         # Check against url tracker
         if with_tracker
-          return false if  url_tracker.visited?(@options[:include_query_string_in_saved_page] ? url.to_s : url.to_s.gsub(/\?.*$/,''))
+          return false if url_tracker.visited?(@options[:include_query_string_in_saved_page] ? url.to_s : url.to_s.gsub(/\?.*$/,''))
         end
         @logger.info {"should_be_visited took: #{Time.now - start} seconds"}
         true
