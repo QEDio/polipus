@@ -138,7 +138,7 @@ module Polipus
           http  = @http_pool[worker_number]   ||= HTTP.new(@options)
           queue = @queues_pool[worker_number] ||= queue_factory
           queue.process(false, @options[:read_timeout]) do |message|
-
+            start = Time.now
             next if message.nil?
 
             execute_plugin 'on_message_received'
@@ -164,9 +164,9 @@ module Polipus
 
             execute_plugin 'on_before_download'
 
-            start = Time.now
+            start_fetch = Time.now
             pages = http.fetch_pages(url, page.referer, page.depth)
-            @logger.info {"http fetch took: #{Time.now - start} seconds"}
+            @logger.info {"http fetch took: #{Time.now - start_fetch} seconds"}
 
             if pages.count > 1
               rurls = pages.map { |e| e.url.to_s }.join(' --> ')
@@ -195,7 +195,7 @@ module Polipus
             
             @logger.debug {"[worker ##{worker_number}] Fetched page: [#{page.url.to_s}] Referer: [#{page.referer}] Depth: [#{page.depth}] Code: [#{page.code}] Response Time: [#{page.response_time}]"}
             @logger.info  {"[worker ##{worker_number}] Page [#{page.url.to_s}] downloaded"}
-            @logger.info {"all took: #{Time.now - start} seconds"}
+            @logger.info {"processing took: #{Time.now - start} seconds"}
             
             incr_pages
 
@@ -220,6 +220,8 @@ module Polipus
               queue.commit
               break
             end
+
+            @logger.info {"all took: #{Time.now - start_fetch} seconds"}
             true
           end
         end
