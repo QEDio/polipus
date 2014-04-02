@@ -52,3 +52,4 @@ Gemfile.lock
 
 my_test/
 .idea/
+.rvmrc
