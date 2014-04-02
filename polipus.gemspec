@@ -20,7 +20,7 @@ Gem::Specification.new do |s|
   s.executables   = `git ls-files -- bin/*`.split("\n").map{ |f| File.basename(f) }
   s.require_paths = ['lib']
 
-  s.add_dependency 'redis-bloomfilter', '~> 0.0.1'
+  #s.add_dependency 'redis-bloomfilter', '~> 0.0.1'
   s.add_dependency 'redis-queue',       '~> 0.0.3'
   s.add_dependency 'redis-namespace'
   s.add_dependency 'nokogiri',          '~> 1.6.0'

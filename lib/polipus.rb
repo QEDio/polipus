@@ -202,12 +202,13 @@ module Polipus
             @on_page_downloaded.each {|e| e.call(page)} unless page.nil?
 
             if @options[:depth_limit] == false || @options[:depth_limit] > page.depth
+              urls_to_visit = []
               links_for(page).each do |url_to_visit|
-                @logger.info {"links_for inner: #{Time.now - start_fetch} seconds"}
-
                 next unless should_be_visited?(url_to_visit)
-                enqueue url_to_visit, page, queue
+                urls_to_visit << url_to_visit
               end
+
+              enqueue urls_to_visit, page, queue if urls_to_visit.present?
               @logger.info {"links_for: #{Time.now - start_fetch} seconds"}
             else
               @logger.info {"[worker ##{worker_number}] Depth limit reached #{page.depth}"}
@@ -309,7 +310,9 @@ module Polipus
 
     def url_tracker
       if @url_tracker.nil?
-        @url_tracker  = @options[:url_tracker] ||= UrlTracker.bloomfilter(:key_name => "polipus_bf_#{job_name}", :redis => redis_factory_adapter, :driver => 'lua')
+        #@url_tracker  = @options[:url_tracker] ||= UrlTracker.bloomfilter(:key_name => "polipus_bf_#{job_name}", :redis => redis_factory_adapter, :driver => 'lua')
+        # we want ruby for its pipelining support
+        @url_tracker  = @options[:url_tracker] ||= UrlTracker.bloomfilter(:key_name => "polipus_bf_#{job_name}", :redis => redis_factory_adapter, :driver => 'ruby')
       end
       @url_tracker
     end
@@ -363,12 +366,23 @@ module Polipus
       end
 
       # The url is enqueued for a later visit
-      def enqueue url_to_visit, current_page, queue
-        page_to_visit = Page.new(url_to_visit.to_s, :referer => current_page.url.to_s, :depth => current_page.depth + 1)
-        queue << page_to_visit.to_json
-        to_track = @options[:include_query_string_in_saved_page] ? url_to_visit.to_s : url_to_visit.to_s.gsub(/\?.*$/,'')
+      def enqueue urls_to_visit, current_page, queue
+        pages_to_visit = []
+        to_track = []
+
+        urls_to_visit.each do |url_to_visit|
+          page_to_visit = Page.new(url_to_visit.to_s, :referer => current_page.url.to_s, :depth => current_page.depth + 1)
+
+          pages_to_visit << page_to_visit.to_json
+          to_track << @options[:include_query_string_in_saved_page] ? url_to_visit.to_s : url_to_visit.to_s.gsub(/\?.*$/,'')
+
+          @logger.debug {"Added [#{url_to_visit.to_s}] to the queue"}
+        end
+
+        # this should work seamlessly
+        queue << pages_to_visit.map{|ptv|ptv.to_json}
+        # this might not
         url_tracker.visit to_track
-        @logger.debug {"Added [#{url_to_visit.to_s}] to the queue"}        
       end
 
       # It creates a redis client
