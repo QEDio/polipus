@@ -202,10 +202,12 @@ module Polipus
 
             if @options[:depth_limit] == false || @options[:depth_limit] > page.depth
               urls_to_visit = []
+              start = Time.now
               links_for(page).each do |url_to_visit|
                 next unless should_be_visited?(url_to_visit)
                 urls_to_visit << url_to_visit
               end
+              @logger.info {"links_for_loop took: #{Time.now - start} seconds"}
 
               enqueue urls_to_visit, page, queue if urls_to_visit.present?
             else
@@ -366,6 +368,7 @@ module Polipus
         pages_to_visit = []
         to_track = []
 
+        start = Time.now
         urls_to_visit.each do |url_to_visit|
           page_to_visit = Page.new(url_to_visit.to_s, :referer => current_page.url.to_s, :depth => current_page.depth + 1)
 
@@ -374,6 +377,7 @@ module Polipus
 
           @logger.debug {"Added [#{url_to_visit.to_s}] to the queue"}
         end
+        @logger.info {"urls to visit loop: #{Time.now - start} seconds"}
 
         # this should work seamlessly
         start = Time.now
