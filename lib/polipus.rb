@@ -170,7 +170,7 @@ module Polipus
               @logger.info {"Got redirects! #{rurls}"}
               page = pages.pop
               page.aliases = pages.collect { |e| e.url }
-              if @@storage.exists?(page)
+              if @storage.exists?(page)
                 @logger.info {"[worker ##{worker_number}] Page [#{page.url.to_s}] already stored."}
                 queue.commit
                 next
