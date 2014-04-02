@@ -138,7 +138,6 @@ module Polipus
           http  = @http_pool[worker_number]   ||= HTTP.new(@options)
           queue = @queues_pool[worker_number] ||= queue_factory
           queue.process(false, @options[:read_timeout]) do |message|
-            start = Time.now
             next if message.nil?
 
             execute_plugin 'on_message_received'
@@ -209,7 +208,6 @@ module Polipus
               end
 
               enqueue urls_to_visit, page, queue if urls_to_visit.present?
-              @logger.info {"links_for: #{Time.now - start_fetch} seconds"}
             else
               @logger.info {"[worker ##{worker_number}] Depth limit reached #{page.depth}"}
             end
@@ -224,8 +222,6 @@ module Polipus
               queue.commit
               break
             end
-
-            @logger.info {"all took: #{Time.now - start_fetch} seconds"}
             true
           end
         end
@@ -380,9 +376,14 @@ module Polipus
         end
 
         # this should work seamlessly
+        start = Time.now
         queue << pages_to_visit.map{|ptv|ptv.to_json}
+        @logger.info {"pages_to_visit took: #{Time.now - start} seconds"}
+
+        start = Time.now
         # this might not
         url_tracker.visit to_track
+        @logger.info {"url_tracker took: #{Time.now - start} seconds"}
       end
 
       # It creates a redis client
