@@ -195,19 +195,16 @@ module Polipus
             
             @logger.debug {"[worker ##{worker_number}] Fetched page: [#{page.url.to_s}] Referer: [#{page.referer}] Depth: [#{page.depth}] Code: [#{page.code}] Response Time: [#{page.response_time}]"}
             @logger.info  {"[worker ##{worker_number}] Page [#{page.url.to_s}] downloaded"}
-            @logger.info {"processing took: #{Time.now - start} seconds"}
             
             incr_pages
-
-            @logger.info {"incr_pages: #{Time.now - start_fetch} seconds"}
 
             # Execute on_page_downloaded blocks
             @on_page_downloaded.each {|e| e.call(page)} unless page.nil?
 
-            @logger.info {"@on_page_downloaded: #{Time.now - start_fetch} seconds"}
-
             if @options[:depth_limit] == false || @options[:depth_limit] > page.depth
               links_for(page).each do |url_to_visit|
+                @logger.info {"links_for inner: #{Time.now - start_fetch} seconds"}
+
                 next unless should_be_visited?(url_to_visit)
                 enqueue url_to_visit, page, queue
               end
@@ -219,11 +216,7 @@ module Polipus
             @logger.debug {"[worker ##{worker_number}] Queue size: #{queue.size}"}
             @overflow_manager.perform if @overflow_manager && queue.empty?
 
-            @logger.info {"@overflow_manager: #{Time.now - start_fetch} seconds"}
-
             execute_plugin 'on_message_processed'
-
-            @logger.info {"execute_plugin: #{Time.now - start_fetch} seconds"}
 
             if PolipusSignalHandler.terminated?
               @logger.info {'About to exit! Thanks for using Polipus'}
