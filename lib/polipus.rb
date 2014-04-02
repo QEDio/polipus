@@ -199,21 +199,31 @@ module Polipus
             
             incr_pages
 
+            @logger.info {"incr_pages: #{Time.now - start_fetch} seconds"}
+
             # Execute on_page_downloaded blocks
             @on_page_downloaded.each {|e| e.call(page)} unless page.nil?
+
+            @logger.info {"@on_page_downloaded: #{Time.now - start_fetch} seconds"}
 
             if @options[:depth_limit] == false || @options[:depth_limit] > page.depth
               links_for(page).each do |url_to_visit|
                 next unless should_be_visited?(url_to_visit)
                 enqueue url_to_visit, page, queue
               end
+              @logger.info {"links_for: #{Time.now - start_fetch} seconds"}
             else
               @logger.info {"[worker ##{worker_number}] Depth limit reached #{page.depth}"}
             end
 
             @logger.debug {"[worker ##{worker_number}] Queue size: #{queue.size}"}
             @overflow_manager.perform if @overflow_manager && queue.empty?
+
+            @logger.info {"@overflow_manager: #{Time.now - start_fetch} seconds"}
+
             execute_plugin 'on_message_processed'
+
+            @logger.info {"execute_plugin: #{Time.now - start_fetch} seconds"}
 
             if PolipusSignalHandler.terminated?
               @logger.info {'About to exit! Thanks for using Polipus'}
