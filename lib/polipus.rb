@@ -21,45 +21,45 @@ module Polipus
 
   class PolipusCrawler
     OPTS = {
-      # run 4 threads
-      :workers => 4,
-      # identify self as Anemone/VERSION
-      :user_agent => "Polipus - #{Polipus::VERSION} - #{Polipus::HOMEPAGE}",
-      # by default, don't limit the depth of the crawl
-      :depth_limit => false,
-      # number of times HTTP redirects will be followed
-      :redirect_limit => 5,
-      # storage engine defaults to DevNull 
-      :storage => nil,
-      # proxy server hostname 
-      :proxy_host => nil,
-      # proxy server port number
-      :proxy_port => false,
-      # HTTP read timeout in seconds
-      :read_timeout => 30,
-      # An URL tracker instance. default is Bloomfilter based on redis
-      :url_tracker => nil,
-      # A Redis options {} that will be passed directly to Redis.new
-      :redis_options => {},
-      # An instance of logger
-      :logger => nil,
-      # whether the query string should be included in the saved page
-      :include_query_string_in_saved_page => true,
-      # Max number of items to keep on redis
-      :queue_items_limit => 2_000_000,
-      # The adapter used to store exceed (queue_items_limit) redis items
-      :queue_overflow_adapter => nil,
-      # Every x seconds, the main queue is checked for overflowed items
-      :queue_overflow_manager_check_time => 60,
-      # If true, each page downloaded will increment a counter on redis
-      :stats_enabled => false,
-      # Cookies strategy
-      :cookie_jar => nil,
-      :accept_cookies => false,
-      # A set of hosts that should be considered parts of the same domain
-      # Eg It can be used to follow links with and without 'www' domain
-      # Format: http://www.abc.com, http://abc.com
-      :domain_aliases => []
+        # run 4 threads
+        :workers => 4,
+        # identify self as Anemone/VERSION
+        :user_agent => "Polipus - #{Polipus::VERSION} - #{Polipus::HOMEPAGE}",
+        # by default, don't limit the depth of the crawl
+        :depth_limit => false,
+        # number of times HTTP redirects will be followed
+        :redirect_limit => 5,
+        # storage engine defaults to DevNull
+        :storage => nil,
+        # proxy server hostname
+        :proxy_host => nil,
+        # proxy server port number
+        :proxy_port => false,
+        # HTTP read timeout in seconds
+        :read_timeout => 30,
+        # An URL tracker instance. default is Bloomfilter based on redis
+        :url_tracker => nil,
+        # A Redis options {} that will be passed directly to Redis.new
+        :redis_options => {},
+        # An instance of logger
+        :logger => nil,
+        # whether the query string should be included in the saved page
+        :include_query_string_in_saved_page => true,
+        # Max number of items to keep on redis
+        :queue_items_limit => 2_000_000,
+        # The adapter used to store exceed (queue_items_limit) redis items
+        :queue_overflow_adapter => nil,
+        # Every x seconds, the main queue is checked for overflowed items
+        :queue_overflow_manager_check_time => 60,
+        # If true, each page downloaded will increment a counter on redis
+        :stats_enabled => false,
+        # Cookies strategy
+        :cookie_jar => nil,
+        :accept_cookies => false,
+        # A set of hosts that should be considered parts of the same domain
+        # Eg It can be used to follow links with and without 'www' domain
+        # Format: http://www.abc.com, http://abc.com
+        :domain_aliases => []
     }
 
     attr_reader :storage
@@ -88,7 +88,7 @@ module Polipus
       @http_pool          = []
       @workers_pool       = []
       @queues_pool        = []
-      
+
       @follow_links_like  = []
       @skip_links_like    = []
       @on_page_downloaded = []
@@ -114,7 +114,7 @@ module Polipus
     def self.crawl(job_name, urls, opts = {})
       self.new(job_name, urls, opts) do |polipus|
         yield polipus if block_given?
-        
+
         polipus.takeover
       end
     end
@@ -157,7 +157,7 @@ module Polipus
               queue.commit
               next
             end
-            
+
             url = page.url.to_s
             @logger.debug {"[worker ##{worker_number}] Fetching page: [#{page.url.to_s}] Referer: #{page.referer} Depth: #{page.depth}"}
 
@@ -180,21 +180,21 @@ module Polipus
             else
               page = pages.last
             end
-            
+
             # Execute on_before_save blocks
             @on_before_save.each {|e| e.call(page)} unless page.nil?
             execute_plugin 'on_after_download'
-            
+
             @logger.warn {"Page #{page.url} has error: #{page.error}"} if page.error
 
             incr_error if page.error
 
             # allow user to tell us to save this page or not
             @storage.add page if !page.nil? and @should_save.call(page)
-            
+
             @logger.debug {"[worker ##{worker_number}] Fetched page: [#{page.url.to_s}] Referer: [#{page.referer}] Depth: [#{page.depth}] Code: [#{page.code}] Response Time: [#{page.response_time}]"}
             @logger.info  {"[worker ##{worker_number}] Page [#{page.url.to_s}] downloaded"}
-            
+
             incr_pages
 
             # Execute on_page_downloaded blocks
@@ -202,12 +202,13 @@ module Polipus
 
             if @options[:depth_limit] == false || @options[:depth_limit] > page.depth
               start = Time.now
-
               urls_to_visit = should_be_visited?(links_for(page))
+              @logger.info {"should_be_visited? took: #{Time.now - start} seconds"}
 
-              @logger.info {"links_for_loop took: #{Time.now - start} seconds"}
-
+              start = Time.now
               enqueue(urls_to_visit, page, queue) if urls_to_visit.present?
+              @logger.info {"enqueue took: #{Time.now - start} seconds"}
+
             else
               @logger.info {"[worker ##{worker_number}] Depth limit reached #{page.depth}"}
             end
@@ -230,7 +231,7 @@ module Polipus
       @on_crawl_end.each {|e| e.call(self)}
       execute_plugin 'on_crawl_end'
     end
-    
+
     # A pattern or an array of patterns can be passed as argument
     # An url will be discarded if it doesn't match patterns
     def follow_links_like(*patterns)
@@ -332,152 +333,166 @@ module Polipus
     end
 
     private
-      # URLs enqueue policy
-      def should_be_visited?(urls, with_tracker = true)
-        start = Time.now
-        arr_urls = Array.try_convert(urls) || [urls]
-        should_visit = []
+    # URLs enqueue policy
+    def should_be_visited?(urls, with_tracker = true)
+      start = Time.now
+      arr_urls = Array.try_convert(urls) || [urls]
+      should_visit = []
 
-        urls.each do |url|
-          # Check against whitelist pattern matching
-          unless @follow_links_like.empty?
-            next unless @follow_links_like.any?{|p| url.path =~ p}
-          end
-
-          # Check against blacklist pattern matching
-          unless @skip_links_like.empty?
-            next if @skip_links_like.any?{|p| url.path =~ p}
-          end
-
-          should_visit << url
+      arr_urls.each do |url|
+        # Check against whitelist pattern matching
+        unless @follow_links_like.empty?
+          next unless @follow_links_like.any?{|p| url.path =~ p}
         end
 
-        # Check against url tracker
-        if with_tracker
-          should_visit = should_visit.map{|url|url.to_s.gsub(/\?.*$/,'')} unless @options[:include_query_string_in_saved_page]
-          # visited? returns all urls we already have visited (or at least which the bloomfilter thinks he has seen already)
-          @logger.info{"should visit before url_tracker: #{should_visit.length}"}
-          should_visit = should_visit - url_tracker.visited?(should_visit)
-          @logger.info{"should visit after url_tracker: #{should_visit.length}"}
+        # Check against blacklist pattern matching
+        unless @skip_links_like.empty?
+          next if @skip_links_like.any?{|p| url.path =~ p}
         end
-        @logger.info {"should_be_visited took: #{Time.now - start} seconds"}
 
-        if arr_urls.length == 1
-          if should_visit.length == 1
-            return true
+        should_visit << url
+      end
+
+      # Check against url tracker
+      if with_tracker
+        should_visit = include_query_string_in_saved_page(should_visit)
+
+        # visited? returns all urls we already have visited (or at least which the bloomfilter thinks he has seen already)
+        @logger.info{"should visit before url_tracker: #{should_visit.length}"}
+        should_visit = should_visit - url_tracker.visited?(should_visit)
+        @logger.info{"should visit after url_tracker: #{should_visit.length}"}
+      end
+      @logger.info {"should_be_visited took: #{Time.now - start} seconds"}
+
+      if arr_urls.length == 1
+        if should_visit.length == 1
+          return true
+        else
+          return false
+        end
+      end
+
+      return should_visit
+    end
+
+    # It extracts URLs from the page
+    def links_for page
+      start = Time.now
+      page.domain_aliases = domain_aliases
+      links = @focus_crawl_block.nil? ? page.links : @focus_crawl_block.call(page)
+      @logger.info {"links_for: #{Time.now - start} seconds"}
+      links
+    end
+
+    # The url is enqueued for a later visit
+    def enqueue(urls_to_visit, current_page, queue)
+      start = Time.now
+
+      pages_to_visit = []
+      urls_to_track = []
+
+      urls_to_visit.each do |url_to_visit|
+        page_to_visit = Page.new(url_to_visit.to_s, :referer => current_page.url.to_s, :depth => current_page.depth + 1)
+
+        pages_to_visit << page_to_visit.to_json
+        urls_to_track << include_query_string_in_saved_page(url_to_visit)
+
+        @logger.debug {"Added [#{url_to_visit.to_s}] to the queue"}
+      end
+      @logger.info {"urls to visit loop: #{Time.now - start} seconds"}
+
+      # this should work seamlessly
+      queue << pages_to_visit
+      @logger.info {"pages_to_visit took: #{Time.now - start} seconds"}
+
+      start = Time.now
+      # this might not
+      url_tracker.visit(urls_to_track)
+      @logger.info {"url_tracker took: #{Time.now - start} seconds"}
+    end
+
+    # It creates a redis client
+    def redis_factory_adapter
+      unless @redis_factory.nil?
+        return @redis_factory.call(redis_options)
+      end
+
+      namespace = redis_options.delete(:namespace)
+      r = Redis.new(redis_options)
+      #r = Redis::Namespace.new(namespace.to_sym, redis: r) if namespace.present?
+      r
+    end
+
+    def include_query_string_in_saved_page(url)
+      arr_url = Array.try_convert(url) || [url]
+      ret_arr = []
+      # braces are necessary since << takes precedence over ?
+      arr_url.each{|u|ret_arr << (@options[:include_query_string_in_saved_page] ? u.to_s : u.to_s.gsub(/\?.*$/,''))}
+
+      if arr_url.length == 1
+        return ret_arr[0]
+      end
+
+      return ret_arr
+    end
+
+    # It creates a new distributed queue
+    def queue_factory
+      Redis::Queue.new("polipus_queue_#{@job_name}","bp_polipus_queue_#{@job_name}", :redis => redis_factory_adapter)
+    end
+
+    # If stats enable, it increments errors found
+    def incr_error
+      redis.incr "polipus:#{@job_name}:errors" if @options[:stats_enabled]
+    end
+
+    # If stats enable, it increments pages downloaded
+    def incr_pages
+      redis.incr "polipus:#{@job_name}:pages" if @options[:stats_enabled]
+    end
+
+    # It handles the overflow item policy (if any)
+    def overflow_items_controller
+      @overflow_manager = QueueOverflow::Manager.new(self, queue_factory, @options[:queue_items_limit])
+
+      # In the time, url policy may change so policy is re-evaluated
+      @overflow_manager.url_filter do |page|
+        should_be_visited?(page.url, false)
+      end
+
+      Thread.new do
+
+        redis_lock = redis_factory_adapter
+        op_timeout = @options[:queue_overflow_manager_check_time]
+
+        while true
+          lock = redis_lock.setnx "polipus_queue_overflow-#{@job_name}.lock", 1
+
+          if lock
+            redis_lock.expire "polipus_queue_overflow-#{@job_name}.lock", op_timeout + 350
+            removed, restored = @overflow_manager.perform
+            @logger.info {"Overflow Manager: items removed=#{removed}, items restored=#{restored}, items stored=#{queue_overflow_adapter.size}"}
+            redis_lock.del "polipus_queue_overflow-#{@job_name}.lock"
           else
-            return false
+            @logger.info {"Lock not acquired"}
           end
-        end
 
-        return should_visit
-      end
-
-      # It extracts URLs from the page
-      def links_for page
-        start = Time.now
-        page.domain_aliases = domain_aliases
-        links = @focus_crawl_block.nil? ? page.links : @focus_crawl_block.call(page)
-        @logger.info {"links_for: #{Time.now - start} seconds"}
-        links
-      end
-
-      # The url is enqueued for a later visit
-      def enqueue(urls_to_visit, current_page, queue)
-        start = Time.now
-
-        pages_to_visit = []
-        urls_to_track = []
-
-        urls_to_visit.each do |url_to_visit|
-          page_to_visit = Page.new(url_to_visit.to_s, :referer => current_page.url.to_s, :depth => current_page.depth + 1)
-
-          pages_to_visit << page_to_visit.to_json
-          urls_to_track << @options[:include_query_string_in_saved_page] ? url_to_visit.to_s : url_to_visit.to_s.gsub(/\?.*$/,'')
-
-          @logger.debug {"Added [#{url_to_visit.to_s}] to the queue"}
-        end
-        @logger.info {"urls to visit loop: #{Time.now - start} seconds"}
-
-        # this should work seamlessly
-        queue << pages_to_visit
-        @logger.info {"pages_to_visit took: #{Time.now - start} seconds"}
-
-        start = Time.now
-        # this might not
-        url_tracker.visit(urls_to_track)
-        @logger.info {"url_tracker took: #{Time.now - start} seconds"}
-      end
-
-      # It creates a redis client
-      def redis_factory_adapter
-        unless @redis_factory.nil?
-          return @redis_factory.call(redis_options)
-        end
-
-        namespace = redis_options.delete(:namespace)
-        r = Redis.new(redis_options)
-        #r = Redis::Namespace.new(namespace.to_sym, redis: r) if namespace.present?
-        r
-      end
-
-      # It creates a new distributed queue
-      def queue_factory
-        Redis::Queue.new("polipus_queue_#{@job_name}","bp_polipus_queue_#{@job_name}", :redis => redis_factory_adapter)
-      end
-
-      # If stats enable, it increments errors found
-      def incr_error
-        redis.incr "polipus:#{@job_name}:errors" if @options[:stats_enabled]
-      end
-
-      # If stats enable, it increments pages downloaded
-      def incr_pages
-        redis.incr "polipus:#{@job_name}:pages" if @options[:stats_enabled]
-      end
-
-      # It handles the overflow item policy (if any)
-      def overflow_items_controller
-        @overflow_manager = QueueOverflow::Manager.new(self, queue_factory, @options[:queue_items_limit])
-
-        # In the time, url policy may change so policy is re-evaluated
-        @overflow_manager.url_filter do |page|
-          should_be_visited?(page.url, false)
-        end
-
-        Thread.new do
-         
-          redis_lock = redis_factory_adapter
-          op_timeout = @options[:queue_overflow_manager_check_time]
-
-          while true
-            lock = redis_lock.setnx "polipus_queue_overflow-#{@job_name}.lock", 1
-
-            if lock
-              redis_lock.expire "polipus_queue_overflow-#{@job_name}.lock", op_timeout + 350
-              removed, restored = @overflow_manager.perform
-              @logger.info {"Overflow Manager: items removed=#{removed}, items restored=#{restored}, items stored=#{queue_overflow_adapter.size}"}
-              redis_lock.del "polipus_queue_overflow-#{@job_name}.lock"
-            else
-              @logger.info {"Lock not acquired"}
-            end
-
-            sleep @options[:queue_overflow_manager_check_time]
-          end
+          sleep @options[:queue_overflow_manager_check_time]
         end
       end
+    end
 
-      # It invokes a plugin method if any
-      def execute_plugin method
+    # It invokes a plugin method if any
+    def execute_plugin method
 
-        Polipus::Plugin.plugins.each do |k,p|
-          if p.respond_to? method
-            @logger.info("Running plugin method #{method} on #{k}")
-            ret_val = p.send(method, self)
-            instance_eval(&ret_val) if ret_val.kind_of? Proc
-          end
+      Polipus::Plugin.plugins.each do |k,p|
+        if p.respond_to? method
+          @logger.info("Running plugin method #{method} on #{k}")
+          ret_val = p.send(method, self)
+          instance_eval(&ret_val) if ret_val.kind_of? Proc
         end
       end
+    end
 
   end
 
@@ -507,5 +522,4 @@ module Polipus
       self.instance.terminated
     end
   end
-
 end
