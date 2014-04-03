@@ -91,6 +91,7 @@ module Polipus
 
       @follow_links_like  = []
       @skip_links_like    = []
+      @link_check_order   = [:whitelist, :blacklist]
       @on_page_downloaded = []
       @on_before_save     = []
       @should_save        = lambda {|page| true}
@@ -224,6 +225,12 @@ module Polipus
       execute_plugin 'on_crawl_end'
     end
 
+    def link_check_order(order)
+      if order.present?
+        @link_check_order = order
+      end
+    end
+
     # A pattern or an array of patterns can be passed as argument
     # An url will be discarded if it doesn't match patterns
     def follow_links_like(*patterns)
@@ -333,15 +340,14 @@ module Polipus
       should_visit = []
 
       arr_urls.each do |url|
-        # Check against whitelist pattern matching
-        unless @follow_links_like.empty?
-          next unless @follow_links_like.any?{|p| url.path =~ p}
+        dont_skip = true
+
+        @link_check_order.each do |list|
+          dont_skip = dont_skip && skip_url(list, url)
+          break unless dont_skip
         end
 
-        # Check against blacklist pattern matching
-        unless @skip_links_like.empty?
-          next if @skip_links_like.any?{|p| url.path =~ p}
-        end
+        next unless dont_skip
 
         should_visit << url
       end
@@ -363,6 +369,34 @@ module Polipus
       end
 
       return should_visit
+    end
+
+    def skip_url(list, url)
+      case list
+        when :whitelist then check_whitelist(url)
+        when :blacklist then check_blacklist(url)
+        else raise "Unknwon list: #{list}"
+      end
+    end
+
+    def check_whitelist(url)
+      pass = true
+      # Check against whitelist pattern matching
+      unless @follow_links_like.empty?
+        @follow_links_like.any?{|p| url.path =~ p}
+      end
+
+      return pass
+    end
+
+    def check_blacklist(url)
+      pass = true
+      # Check against whitelist pattern matching
+      unless @skip_links_like.empty?
+        pass = !@skip_links_like.any?{|p| url.path =~ p}
+      end
+
+      return pass
     end
 
     # It extracts URLs from the page
