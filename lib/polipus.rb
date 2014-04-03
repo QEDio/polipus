@@ -327,7 +327,9 @@ module Polipus
     private
     # URLs enqueue policy
     def should_be_visited?(urls, with_tracker = true)
-      arr_urls = Array.try_convert(urls) || [urls]
+      is_array = Array.try_convert(urls) ? true : false
+      arr_urls = is_array ? urls : [urls]
+
       should_visit = []
 
       arr_urls.each do |url|
@@ -352,7 +354,7 @@ module Polipus
         should_visit = should_visit - url_tracker.visited?(should_visit)
       end
 
-      if arr_urls.length == 1
+      unless is_array
         if should_visit.length == 1
           return true
         else
@@ -401,12 +403,13 @@ module Polipus
     end
 
     def include_query_string_in_saved_page(url)
-      arr_url = Array.try_convert(url) || [url]
+      is_array = Array.try_convert(url) ? true : false
+      arr_url =  is_array ? url : [url]
       ret_arr = []
       # braces are necessary since << takes precedence over ?
       arr_url.each{|u|ret_arr << (@options[:include_query_string_in_saved_page] ? u.to_s : u.to_s.gsub(/\?.*$/,''))}
 
-      if arr_url.length == 1
+      unless is_array
         return ret_arr[0]
       end
 
