@@ -201,17 +201,13 @@ module Polipus
             @on_page_downloaded.each {|e| e.call(page)} unless page.nil?
 
             if @options[:depth_limit] == false || @options[:depth_limit] > page.depth
-              urls_to_visit = []
               start = Time.now
 
-              links_for(page).each do |url_to_visit|
-                next unless should_be_visited?(url_to_visit)
-                urls_to_visit << url_to_visit
-              end
+              urls_to_visit = should_be_visited?(links_for(page))
 
               @logger.info {"links_for_loop took: #{Time.now - start} seconds"}
 
-              enqueue urls_to_visit, page, queue if urls_to_visit.present?
+              enqueue(urls_to_visit, page, queue) if urls_to_visit.present?
             else
               @logger.info {"[worker ##{worker_number}] Depth limit reached #{page.depth}"}
             end
@@ -337,24 +333,44 @@ module Polipus
 
     private
       # URLs enqueue policy
-      def should_be_visited?(url, with_tracker = true)
+      def should_be_visited?(urls, with_tracker = true)
         start = Time.now
-        # Check against whitelist pattern matching
-        unless @follow_links_like.empty?
-          return false unless @follow_links_like.any?{|p| url.path =~ p}  
-        end
+        arr_urls = Array.try_convert(urls) || [urls]
+        should_visit = []
 
-        # Check against blacklist pattern matching
-        unless @skip_links_like.empty?
-          return false if @skip_links_like.any?{|p| url.path =~ p}
+        urls.each do |url|
+          # Check against whitelist pattern matching
+          unless @follow_links_like.empty?
+            next unless @follow_links_like.any?{|p| url.path =~ p}
+          end
+
+          # Check against blacklist pattern matching
+          unless @skip_links_like.empty?
+            next if @skip_links_like.any?{|p| url.path =~ p}
+          end
+
+          should_visit << url
         end
 
         # Check against url tracker
         if with_tracker
-          return false if url_tracker.visited?(@options[:include_query_string_in_saved_page] ? url.to_s : url.to_s.gsub(/\?.*$/,''))
+          should_visit = should_visit.map{|url|url.to_s.gsub(/\?.*$/,'')} unless @options[:include_query_string_in_saved_page]
+          # visited? returns all urls we already have visited (or at least which the bloomfilter thinks he has seen already)
+          @logger.info{"should visit before url_tracker: #{should_visit.length}"}
+          should_visit = should_visit - url_tracker.visited?(should_visit)
+          @logger.info{"should visit after url_tracker: #{should_visit.length}"}
         end
         @logger.info {"should_be_visited took: #{Time.now - start} seconds"}
-        true
+
+        if arr_urls.length == 1
+          if should_visit.length == 1
+            return true
+          else
+            return false
+          end
+        end
+
+        return should_visit
       end
 
       # It extracts URLs from the page
@@ -367,29 +383,29 @@ module Polipus
       end
 
       # The url is enqueued for a later visit
-      def enqueue urls_to_visit, current_page, queue
-        pages_to_visit = []
-        to_track = []
-
+      def enqueue(urls_to_visit, current_page, queue)
         start = Time.now
+
+        pages_to_visit = []
+        urls_to_track = []
+
         urls_to_visit.each do |url_to_visit|
           page_to_visit = Page.new(url_to_visit.to_s, :referer => current_page.url.to_s, :depth => current_page.depth + 1)
 
           pages_to_visit << page_to_visit.to_json
-          to_track << @options[:include_query_string_in_saved_page] ? url_to_visit.to_s : url_to_visit.to_s.gsub(/\?.*$/,'')
+          urls_to_track << @options[:include_query_string_in_saved_page] ? url_to_visit.to_s : url_to_visit.to_s.gsub(/\?.*$/,'')
 
           @logger.debug {"Added [#{url_to_visit.to_s}] to the queue"}
         end
         @logger.info {"urls to visit loop: #{Time.now - start} seconds"}
 
         # this should work seamlessly
-        start = Time.now
-        queue << pages_to_visit.map{|ptv|ptv.to_json}
+        queue << pages_to_visit
         @logger.info {"pages_to_visit took: #{Time.now - start} seconds"}
 
         start = Time.now
         # this might not
-        url_tracker.visit to_track
+        url_tracker.visit(urls_to_track)
         @logger.info {"url_tracker took: #{Time.now - start} seconds"}
       end
 
