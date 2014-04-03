@@ -163,9 +163,7 @@ module Polipus
 
             execute_plugin 'on_before_download'
 
-            start_fetch = Time.now
             pages = http.fetch_pages(url, page.referer, page.depth)
-            @logger.info {"http fetch took: #{Time.now - start_fetch} seconds"}
 
             if pages.count > 1
               rurls = pages.map { |e| e.url.to_s }.join(' --> ')
@@ -201,14 +199,8 @@ module Polipus
             @on_page_downloaded.each {|e| e.call(page)} unless page.nil?
 
             if @options[:depth_limit] == false || @options[:depth_limit] > page.depth
-              start = Time.now
               urls_to_visit = should_be_visited?(links_for(page))
-              @logger.info {"should_be_visited? took: #{Time.now - start} seconds"}
-
-              start = Time.now
               enqueue(urls_to_visit, page, queue) if urls_to_visit.present?
-              @logger.info {"enqueue took: #{Time.now - start} seconds"}
-
             else
               @logger.info {"[worker ##{worker_number}] Depth limit reached #{page.depth}"}
             end
@@ -335,7 +327,6 @@ module Polipus
     private
     # URLs enqueue policy
     def should_be_visited?(urls, with_tracker = true)
-      start = Time.now
       arr_urls = Array.try_convert(urls) || [urls]
       should_visit = []
 
@@ -358,11 +349,8 @@ module Polipus
         should_visit = include_query_string_in_saved_page(should_visit)
 
         # visited? returns all urls we already have visited (or at least which the bloomfilter thinks he has seen already)
-        @logger.info{"should visit before url_tracker: #{should_visit.length}"}
         should_visit = should_visit - url_tracker.visited?(should_visit)
-        @logger.info{"should visit after url_tracker: #{should_visit.length}"}
       end
-      @logger.info {"should_be_visited took: #{Time.now - start} seconds"}
 
       if arr_urls.length == 1
         if should_visit.length == 1
@@ -377,17 +365,13 @@ module Polipus
 
     # It extracts URLs from the page
     def links_for page
-      start = Time.now
       page.domain_aliases = domain_aliases
       links = @focus_crawl_block.nil? ? page.links : @focus_crawl_block.call(page)
-      @logger.info {"links_for: #{Time.now - start} seconds"}
       links
     end
 
     # The url is enqueued for a later visit
     def enqueue(urls_to_visit, current_page, queue)
-      start = Time.now
-
       pages_to_visit = []
       urls_to_track = []
 
@@ -399,16 +383,9 @@ module Polipus
 
         @logger.debug {"Added [#{url_to_visit.to_s}] to the queue"}
       end
-      @logger.info {"urls to visit loop: #{Time.now - start} seconds"}
 
-      # this should work seamlessly
       queue << pages_to_visit
-      @logger.info {"pages_to_visit took: #{Time.now - start} seconds"}
-
-      start = Time.now
-      # this might not
       url_tracker.visit(urls_to_track)
-      @logger.info {"url_tracker took: #{Time.now - start} seconds"}
     end
 
     # It creates a redis client
