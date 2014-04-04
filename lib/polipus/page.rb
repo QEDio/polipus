@@ -212,7 +212,15 @@ module Polipus
     end
 
     def self.from_json(json)
-      hash = JSON.parse json
+      begin
+        hash = JSON.parse json
+      rescue JSON::ParserError => e
+        json = json[1..-2] if json[0].eql("'") && json[-1].eql["'"]
+        json = json.gsub("\\", '')
+        hash = JSON.parse json
+        Rails.logger.error("JSON-Parse error. I fixed that for you but, I should have to. #{json}")
+      end
+
       self.from_hash hash
     end
   end
